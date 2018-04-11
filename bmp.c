@@ -10,7 +10,9 @@ int bmp_loadfromfile(PIXEL *dest, char filename[])
     FILE *file;
     HEADER *header;
     INFOHEADER *infoheader;
+    COLORTABLE **colortable;
     int status;
+    int i, j;
     char endian = 0;
 
     assert(filename != NULL);
@@ -48,7 +50,48 @@ int bmp_loadfromfile(PIXEL *dest, char filename[])
         return status;
     }
 
+    if(infoheader->planes != 1 )
+    {
+        free(header);
+        fclose(file);
+        free(infoheader);
+        return LOAD_ERR_CORUPTED_HEADER;
+    }
+
+    if(infoheader->compression != 0)
+    {
+        free(header);
+        fclose(file);
+        free(infoheader);
+        return LOAD_ERR_NOT_SUPPORTED; 
+    }
+
     bmp_printinfoheader(infoheader);
+
+    if(infoheader->bits == 1 || infoheader->bits == 4)
+    {
+        if((colortable = malloc(infoheader->bits * sizeof(COLORTABLE *))) == NULL)
+        {
+            free(header);
+            fclose(file);
+            free(infoheader);
+            return LOAD_ERR_ALLOC_ERR; 
+        }
+        for(i = 0; i < infoheader->bits; i++)
+        {
+            if((colortable[i] = malloc(sizeof(COLORTABLE))) == NULL)
+            {
+                for(j = 0; j < i; j++)
+                    free(colortable[j]);
+                free(colortable);
+                free(header);
+                fclose(file);
+                free(infoheader);
+                return LOAD_ERR_ALLOC_ERR;
+            }
+        }
+        
+    }
 
     return LOAD_SUCC; 
 }
@@ -147,8 +190,7 @@ void bmp_printheader(HEADER *header)
 {
     assert(header != NULL);
     
-    printf("----------------------------------");
-    printf("BMP HEADER\n");
+    printf("----------------------------------\n");
     printf("type:\t\t\t<%lu>\t(\"%c%c\")\n", header->type, header->type[0], header->type[1]);
     printf("size:\t\t\t<%i>\n", header->size);
     printf("offset:\t\t\t<%lu>\n", header->offset);
@@ -159,6 +201,7 @@ void bmp_printinfoheader(INFOHEADER *infoheader)
 {
     assert(infoheader != NULL);
 
+    printf("----------------------------------\n");
     printf("size:\t\t\t<%i>\n", infoheader->size);
     printf("width:\t\t\t<%i>\n", infoheader->width);
     printf("height:\t\t\t<%i>\n", infoheader->height);

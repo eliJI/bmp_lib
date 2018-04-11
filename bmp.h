@@ -25,6 +25,13 @@ typedef struct {
 } INFOHEADER;
 
 typedef struct {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+    uint8_t reserved;
+}   COLORTABLE;
+
+typedef struct {
     char red;
     char green;
     char blue;
@@ -44,6 +51,9 @@ int bmp_loadinfoheader(INFOHEADER *dest, FILE *file, const char endian);
 #define BMP_ID 19778
 #define BMP_HEADER_LEN 14
 #define BMP_INFOHEADER_LEN 40
+#define BMP_BBP_1 1
+#define BMP_BBP_4 16
+
 
 #define LOAD_SUCC                   0
 #define LOAD_ERR_OPENING            10
@@ -52,5 +62,6 @@ int bmp_loadinfoheader(INFOHEADER *dest, FILE *file, const char endian);
 #define LOAD_ERR_NO_BMP             13
 #define LOAD_ERR_NO_ENDIAN_INFO     14
 #define LOAD_ERR_ALLOC_ERR          15
+#define LOAD_ERR_NOT_SUPPORTED      16
 
 #endif
