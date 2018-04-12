@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <stdlib.h>
+#include <assert.h>
 
 #include "bittype.h"
 
@@ -39,4 +41,23 @@ void cpu_to_be16(uint8_t *buf, uint16_t val)
 {
    buf[0] = (val & 0xFF00) >> 8;
    buf[1] = (val & 0x00FF);
+}
+
+void byte_to_bit(uint8_t *buf)
+{
+    uint8_t orig;
+
+    assert(buf != NULL);
+
+    orig = buf[0];
+
+    buf[0] = (orig & 0x01) >> 0;
+    buf[1] = (orig & 0x02) >> 1;
+    buf[2] = (orig & 0x04) >> 2;
+    buf[3] = (orig & 0x08) >> 3;
+    buf[4] = (orig & 0x10) >> 4;
+    buf[5] = (orig & 0x20) >> 5;
+    buf[6] = (orig & 0x40) >> 6;
+    buf[7] = (orig & 0x80) >> 7;
+
 }

@@ -8,7 +8,7 @@ int main(void)
     int status;
     BITMAP *bitmap = NULL;
 
-    status = bmp_loadfromfile(bitmap, "images/sample.bmp");
+    status = bmp_loadfromfile(bitmap, "images/mono.bmp");
 
     bmp_printline();
     printf("status: %i\n", status);

@@ -29,7 +29,7 @@ typedef struct {
     uint8_t green;
     uint8_t blue;
     uint8_t reserved;
-}   COLORTABLE;
+} COLORTABLE;
 
 typedef struct {
     uint8_t color;
@@ -53,9 +53,13 @@ void bmp_unload(BITMAP *bitmap);
 
 int bmp_loadheader(HEADER *dest, FILE *file, char *endian);
 int bmp_loadinfoheader(INFOHEADER *dest, FILE *file, const char endian);
+int bmp_loadcolortable(COLORTABLE **colortable, size_t num, FILE *file);
+
+void bmp_map_colortable_to_pixel(PIXEL *pixel, COLORTABLE *colortable);
 
 void bmp_printheader(HEADER *header);
 void bmp_printinfoheader(INFOHEADER *infoheader);
+void bmp_printcolortable(COLORTABLE *colortable);
 void bmp_printpixel(PIXEL *pixel);
 void bmp_printline(void);
 void bmp_printstatus(int status);

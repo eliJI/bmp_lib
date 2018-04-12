@@ -25,17 +25,17 @@ void freecolortable(COLORTABLE **colortable, uint16_t bits)
     free(colortable);
 }
 
-COLORTABLE **malloccolortable(uint16_t bits)
+COLORTABLE **malloccolortable(size_t num_of_elem)
 {
     unsigned int i, j;
     COLORTABLE **colortable;
 
-    assert(bits > 0);
+    assert(num_of_elem > 0);
 
-    if((colortable = (COLORTABLE **) malloc(bits * sizeof(COLORTABLE *))) == NULL)
+    if ((colortable = (COLORTABLE **)malloc(num_of_elem * sizeof(COLORTABLE *))) == NULL)
         return NULL;
-    
-    for (i = 0; i < bits; i++)
+
+    for (i = 0; i < num_of_elem; i++)
     {
         if ((colortable[i] = (COLORTABLE *) malloc(sizeof(COLORTABLE))) == NULL)
         {
@@ -95,14 +95,17 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
     BITMAP *bitmap = NULL;
     char endian = 0;
     int status;
-    unsigned int i;
+    unsigned int i, j;
     unsigned short int padding;
     unsigned int datasize, pixelcount;
-    
-    uint8_t buf[3];
+
+    uint8_t buf[8];
 
     assert(filename != NULL);
     assert(dest == NULL);
+
+    bmp_printline();
+    printf("opening file: \"%s\"\n", filename);
 
     if((file = fopen(filename, "rb")) == NULL)
         return LOAD_ERR_OPENING;
@@ -159,19 +162,27 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
 
     bmp_printinfoheader(bitmap->infoheader);
 
-    if(bitmap->infoheader->bits == 1 || bitmap->infoheader->bits == 4)
+    if(bitmap->infoheader->bits == 1)
     {
-        if((bitmap->colortable = malloccolortable(bitmap->infoheader->bits)) == NULL)
+        if(((bitmap->colortable = malloccolortable(2)) == NULL) || bmp_loadcolortable(bitmap->colortable, 2, file) != LOAD_SUCC)
         {
             bmp_unload(bitmap);
             fclose(file);
             return status;
-        }        
+        }
+
+    }
+    else if(bitmap->infoheader->bits == 4)
+    {
+        if (((bitmap->colortable = malloccolortable(16)) == NULL) || bmp_loadcolortable(bitmap->colortable, 16, file) != LOAD_SUCC)
+        {
+            bmp_unload(bitmap);
+            fclose(file);
+            return status;
+        }
     }
 
-    /* bmp_printtcolortable(colortable); */
-
-    if(bitmap->infoheader->bits != 24)      /* DURING DEV THIS SHOULD BE CHANGED */
+    if(bitmap->infoheader->bits != 24 && bitmap->infoheader->bits != 1)
     {
         bmp_unload(bitmap);
         fclose(file);
@@ -195,25 +206,66 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
     printf("padding:\t\t<%i>\n", padding);
     bmp_printline();
 
-    for(i = 0; i < pixelcount; i++)
+    switch(bitmap->infoheader->bits)
     {
-        if(padding && !(i % bitmap->infoheader->width) && i != 0)
-        {
-            fread(buf, padding, 1, file);
-            /*
-            printf("DISCARDED:\t");
-            for(j = 0; j < padding; j++)
-                printf("%i ", buf[j]);
-            putchar('\n');
-            */
-        }
-        fread(buf, 3, 1, file);
-        bitmap->pixel[i]->red    = buf[2];
-        bitmap->pixel[i]->green  = buf[1];
-        bitmap->pixel[i]->blue   = buf[0];
-        /* printf("%05i ", i);
-        bmp_printpixel(pixel[i]); */
+        case 1:
+            printf("COLORTABLES \n");
+            printf("<0> ");
+            bmp_printcolortable(bitmap->colortable[0]);
+            printf("<1> ");
+            bmp_printcolortable(bitmap->colortable[1]);
+            bmp_printline();
+
+            for(i = 0; i < (pixelcount + 1) / 8; i++)
+            {
+                if(fread(buf, 1, 1, file) != 1)
+                {
+                    bmp_unload(bitmap);
+                    fclose(file);
+                    return LOAD_ERR_READING;
+                }
+
+                /* if(i % 2 == 0)
+                    putchar(' ');
+                if(i % 16 == 0)
+                    putchar('\n');
+                printf("%02x", buf[0]); */
+                
+
+                byte_to_bit(buf);
+                for(j = 0; j < 8; j++)
+                {
+                    printf("%i ", buf[j]);
+                }
+                putchar('\n');
+            }
+            break;
+
+        case 24:
+            for (i = 0; i < pixelcount; i++)
+            {
+                if (padding && !(i % bitmap->infoheader->width) && i != 0)
+                {
+                    if(fread(buf, padding, 1, file) != 1)
+                    {
+                        bmp_unload(bitmap);
+                        fclose(file);
+                        return LOAD_ERR_READING;
+                    }
+                }
+                if(fread(buf, 3, 1, file) != 1)
+                {
+                    bmp_unload(bitmap);
+                    fclose(file);
+                    return LOAD_ERR_READING;
+                }
+                bitmap->pixel[i]->red = buf[2];
+                bitmap->pixel[i]->green = buf[1];
+                bitmap->pixel[i]->blue = buf[0];
+            }
+            break;
     }
+    
 
     dest = bitmap;
     return LOAD_SUCC; 
@@ -325,6 +377,27 @@ int bmp_loadinfoheader(INFOHEADER *dest, FILE *file, const char endian)
             return LOAD_ERR_CORUPTED_HEADER;
     } 
 }
+
+int bmp_loadcolortable(COLORTABLE **colortable, size_t num, FILE *file)
+{
+    unsigned int i;
+    uint8_t buf[4];
+
+    assert(colortable != NULL);
+    assert(num > 0);
+
+    for(i = 0; i < num; i++)
+    {
+        if(fread(buf, 4, 1, file) != 1)
+            return LOAD_ERR_READING;
+        colortable[i]->red = buf[2];
+        colortable[i]->green = buf[1];
+        colortable[i]->blue = buf[0];
+    }
+
+    return LOAD_SUCC;
+}
+
 unsigned int calcpixelsize(const HEADER *header, const INFOHEADER *infoheader)
 {
     unsigned int datasize;
@@ -348,6 +421,16 @@ unsigned int calcpixelsize(const HEADER *header, const INFOHEADER *infoheader)
     }
 
     return datasize;
+}
+
+void bmp_map_colortable_to_pixel(PIXEL *pixel, COLORTABLE *colortable)
+{
+    assert(pixel != NULL);
+    assert(colortable != NULL);
+    
+    pixel->blue     = colortable->blue;
+    pixel->green    = colortable->green;
+    pixel->red      = colortable->red;
 }
 
 void bmp_printheader(HEADER *header)
@@ -377,6 +460,13 @@ void bmp_printinfoheader(INFOHEADER *infoheader)
     printf("yresolution:\t\t<%i>\n", infoheader->yresolution);
     printf("ncolours:\t\t<%i>\n", infoheader->ncolours);
     printf("importantcolours:\t<%i>\n", infoheader->importantcolours);
+}
+
+void bmp_printcolortable(COLORTABLE *colortable)
+{
+    assert(colortable != NULL);
+
+    printf("RGB:\t%3i, %3i, %3i\n", colortable->red, colortable->green, colortable->blue);
 }
 
 void bmp_printpixel(PIXEL *pixel)

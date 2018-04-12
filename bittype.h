@@ -13,6 +13,6 @@ uint32_t be32_to_cpu(const uint8_t *buf);
 void cpu_to_le16(uint8_t *buf, uint16_t val);
 void cpu_to_be16(uint8_t *buf, uint16_t val);
 
-
+void byte_to_bit(uint8_t *buf);
 
 #endif
