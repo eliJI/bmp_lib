@@ -5,15 +5,96 @@
 #include "bittype.h"
 #include "bmp.h"
 
-int bmp_loadfromfile(PIXEL *dest, char filename[])
+/* POINTER MIGHT BE WRONG */
+void freecolortable(COLORTABLE **colortable, uint16_t bits)
 {
-    FILE *file;
-    HEADER *header;
-    INFOHEADER *infoheader;
+    uint16_t i;
+    
+    if(colortable == NULL)
+        return;
+
+    for(i = 0; i < bits; i++)
+        free(colortable[i]);
+    free(colortable);
+}
+
+COLORTABLE **malloccolortable(uint16_t bits)
+{
+    unsigned int i, j;
     COLORTABLE **colortable;
+
+    assert(bits > 0);
+
+    if((colortable = (COLORTABLE **) malloc(bits * sizeof(COLORTABLE *))) == NULL)
+        return NULL;
+    
+    for (i = 0; i < bits; i++)
+    {
+        if ((colortable[i] = (COLORTABLE *) malloc(sizeof(COLORTABLE))) == NULL)
+        {
+            for (j = 0; j < i; j++)
+                free(colortable[j]);
+            free(colortable);
+            return NULL;
+        }
+    }
+
+    return colortable;
+}
+
+PIXEL **mallocpixel(size_t size)
+{
+    unsigned int i, j;
+    PIXEL **pixel;
+
+    assert(size > 0);
+
+    if((pixel = (PIXEL **) malloc(size * sizeof(PIXEL *))) == NULL)
+        return NULL;
+
+    for(i = 0; i < size; i++)
+    {
+        if((pixel[i] = (PIXEL *) malloc(sizeof(PIXEL))) == NULL)
+        {
+            for(j = 0; j < i; j++)
+                free(pixel[i]);
+            free(pixel);
+
+            return NULL;
+        }
+    }
+
+    return pixel;
+}
+
+void freepixel(PIXEL **pixel, size_t size)
+{
+    unsigned int i;
+
+    assert(size > 0);
+
+    if(pixel == NULL)
+        return;
+    for(i = 0; i < size; i++)
+        free(pixel[i]);
+    free(pixel);
+}
+
+unsigned int calcpixelsize(const HEADER *header, const INFOHEADER *infoheader);
+
+int bmp_loadfromfile(PIXEL *dest, const char filename[])
+{
+    FILE *file = NULL;
+    HEADER *header = NULL;
+    INFOHEADER *infoheader = NULL;
+    COLORTABLE **colortable = NULL;
+    PIXEL **pixel = NULL;
+    unsigned int datasize, pixelcount;
+    unsigned short int padding;
     int status;
-    int i, j;
+    unsigned int i, j;
     char endian = 0;
+    uint8_t buf[3];
 
     assert(filename != NULL);
     assert(dest == NULL);
@@ -70,28 +151,63 @@ int bmp_loadfromfile(PIXEL *dest, char filename[])
 
     if(infoheader->bits == 1 || infoheader->bits == 4)
     {
-        if((colortable = malloc(infoheader->bits * sizeof(COLORTABLE *))) == NULL)
+        if((colortable = malloccolortable(infoheader->bits)) == NULL)
         {
             free(header);
             fclose(file);
             free(infoheader);
-            return LOAD_ERR_ALLOC_ERR; 
-        }
-        for(i = 0; i < infoheader->bits; i++)
-        {
-            if((colortable[i] = malloc(sizeof(COLORTABLE))) == NULL)
-            {
-                for(j = 0; j < i; j++)
-                    free(colortable[j]);
-                free(colortable);
-                free(header);
-                fclose(file);
-                free(infoheader);
-                return LOAD_ERR_ALLOC_ERR;
-            }
-        }
-        
+            return status;
+        }        
     }
+
+    /* bmp_printtcolortable(colortable); */
+
+    if(infoheader->bits != 24)      /* DURING DEV THIS SHOULD BE CHANGED */
+    {
+        free(header);
+        fclose(file);
+        free(infoheader);
+        freecolortable(colortable, infoheader->bits);
+        return LOAD_ERR_NOT_SUPPORTED;
+    }
+    
+    datasize = calcpixelsize(header, infoheader);
+    pixelcount = infoheader->width * infoheader->height;
+
+    padding = (infoheader->width % 4);
+
+    if((pixel = mallocpixel(pixelcount)) == NULL)
+    {
+        free(header);
+        fclose(file);
+        free(infoheader);
+        freecolortable(colortable, infoheader->bits);
+        return status;
+    }
+
+    bmp_printline();
+    printf("datasize:\t\t<%lu>\n", datasize);
+    printf("padding:\t\t<%i>\n", padding);
+    bmp_printline();
+    for(i = 0; i < infoheader->width * infoheader->height; i++)
+    {
+        if(padding && !(i % infoheader->width) && i != 0)
+        {
+            fread(buf, padding, 1, file);
+            printf("DISCARDED:\t");
+            for(j = 0; j < padding; j++)
+                printf("%i ", buf[j]);
+            putchar('\n');
+        }
+        fread(buf, 3, 1, file);
+        pixel[i]->red    = buf[2];
+        pixel[i]->green  = buf[1];
+        pixel[i]->blue   = buf[0];
+        printf("%05i ", i);
+        bmp_printpixel(pixel[i]);
+        /* if((i + 125) % 250 == 0) */
+    }
+
 
     return LOAD_SUCC; 
 }
@@ -109,7 +225,7 @@ int bmp_loadheader(HEADER *dest, FILE *file, char *endian)
     
     if(buf[0] == 'B' && buf[1] == 'M')    /* BIG ENDIAN */
     {
-        printf("LITTLE ENDIAN!!!\n");
+        /*printf("LITTLE ENDIAN!!!\n");*/
         *endian = 'l';
         dest->type[0]       = buf[0];
         dest->type[1]       = buf[1];
@@ -122,9 +238,9 @@ int bmp_loadheader(HEADER *dest, FILE *file, char *endian)
         return LOAD_SUCC;
 
     }
-    else if(buf[1] == 'B' && buf[0] == 'M')
+    else if(buf[1] == 'B' && buf[0] == 'M') /* LITTLE ENDIAN */
     {
-        printf("BIG ENDIAN!!!\n");
+        /*printf("BIG ENDIAN!!!\n");*/
         *endian = 'b';
         dest->type[0]       = buf[1];
         dest->type[1]       = buf[0];
@@ -185,12 +301,36 @@ int bmp_loadinfoheader(INFOHEADER *dest, FILE *file, const char endian)
             return LOAD_ERR_CORUPTED_HEADER;
     } 
 }
+unsigned int calcpixelsize(const HEADER *header, const INFOHEADER *infoheader)
+{
+    unsigned int datasize;
+
+    assert(header != NULL);
+    assert(infoheader != NULL);
+
+    datasize = header->size - BMP_HEADER_LEN - BMP_INFOHEADER_LEN;
+    switch (infoheader->bits)
+    {
+    case 1:
+        datasize -= 4 * BMP_BBP_1;
+        break;
+
+    case 4:
+        datasize -= 4 * BMP_BBP_4;
+        break;
+
+    default:
+        break;
+    }
+
+    return datasize;
+}
 
 void bmp_printheader(HEADER *header)
 {
     assert(header != NULL);
     
-    printf("----------------------------------\n");
+    bmp_printline();
     printf("type:\t\t\t<%lu>\t(\"%c%c\")\n", header->type, header->type[0], header->type[1]);
     printf("size:\t\t\t<%i>\n", header->size);
     printf("offset:\t\t\t<%lu>\n", header->offset);
@@ -201,7 +341,7 @@ void bmp_printinfoheader(INFOHEADER *infoheader)
 {
     assert(infoheader != NULL);
 
-    printf("----------------------------------\n");
+    bmp_printline();
     printf("size:\t\t\t<%i>\n", infoheader->size);
     printf("width:\t\t\t<%i>\n", infoheader->width);
     printf("height:\t\t\t<%i>\n", infoheader->height);
@@ -220,4 +360,9 @@ void bmp_printpixel(PIXEL *pixel)
     assert(pixel != NULL);
 
     printf("RGB:\t%i, %i, %i\n", pixel->red, pixel->green, pixel->blue);
+}
+
+void bmp_printline(void)
+{
+    printf("----------------------------------\n");
 }
