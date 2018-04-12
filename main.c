@@ -6,9 +6,9 @@
 int main(void)
 {
     int status;
-    PIXEL *pixels = NULL;
+    BITMAP *bitmap = NULL;
 
-    status = bmp_loadfromfile(pixels, "images/colors/red.bmp");
+    status = bmp_loadfromfile(bitmap, "images/colors/red.bmp");
 
     bmp_printline();
     printf("status: %i\n", status);

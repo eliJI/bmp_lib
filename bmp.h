@@ -48,7 +48,8 @@ typedef struct {
     PIXEL **pixel;
 } BITMAP;
 
-int bmp_loadfromfile(PIXEL *dest, const char filename[]);
+int bmp_loadfromfile(BITMAP *dest, const char filename[]);
+void bmp_unload(BITMAP *bitmap);
 
 void bmp_printheader(HEADER *header);
 void bmp_printinfoheader(INFOHEADER *infoheader);

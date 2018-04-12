@@ -82,9 +82,10 @@ void freepixel(PIXEL **pixel, size_t size)
 
 unsigned int calcpixelsize(const HEADER *header, const INFOHEADER *infoheader);
 
-int bmp_loadfromfile(PIXEL *dest, const char filename[])
+int bmp_loadfromfile(BITMAP *dest, const char filename[])
 {
     FILE *file = NULL;
+    BITMAP *bitmap = NULL;
     HEADER *header = NULL;
     INFOHEADER *infoheader = NULL;
     COLORTABLE **colortable = NULL;
@@ -99,25 +100,31 @@ int bmp_loadfromfile(PIXEL *dest, const char filename[])
     assert(filename != NULL);
     assert(dest == NULL);
 
-    if((header = malloc(sizeof(HEADER))) == NULL)
+    if((bitmap = malloc(sizeof(BITMAP))) == NULL)
         return LOAD_ERR_ALLOC_ERR;
+
+    if((header = malloc(sizeof(HEADER))) == NULL)
+    {
+        bmp_unload(bitmap);
+        return LOAD_ERR_ALLOC_ERR;
+    }
         
     if((infoheader = malloc(sizeof(INFOHEADER))) == NULL)
     {
-        free(header);
+        bmp_unload(bitmap);
         return LOAD_ERR_ALLOC_ERR;
     }
     
-    file = fopen(filename, "rb");
-
-    if(file == NULL)
+    if((file = fopen(filename, "rb")) == NULL)
+    {
+        bmp_unload(bitmap);
         return LOAD_ERR_OPENING;
+    }
 
     if((status = bmp_loadheader(header, file, &endian)) != LOAD_SUCC)
     {
+        bmp_unload(bitmap);
         fclose(file);
-        free(header);
-        free(infoheader);
         return status;
     }
 
@@ -125,9 +132,8 @@ int bmp_loadfromfile(PIXEL *dest, const char filename[])
 
     if((status = bmp_loadinfoheader(infoheader, file, endian)) != LOAD_SUCC)
     {
-        free(header);
+        bmp_unload(bitmap);
         fclose(file);
-        free(infoheader);
         return status;
     }
 
@@ -189,6 +195,7 @@ int bmp_loadfromfile(PIXEL *dest, const char filename[])
     printf("datasize:\t\t<%lu>\n", datasize);
     printf("padding:\t\t<%i>\n", padding);
     bmp_printline();
+
     for(i = 0; i < infoheader->width * infoheader->height; i++)
     {
         if(padding && !(i % infoheader->width) && i != 0)
@@ -212,6 +219,23 @@ int bmp_loadfromfile(PIXEL *dest, const char filename[])
     return LOAD_SUCC; 
 }
 
+void bmp_unload(BITMAP *bitmap)
+{
+    if(bitmap == NULL);
+        return;
+        
+    if(bitmap->header != NULL)
+    {
+        if(bitmap->infoheader != NULL)
+        {
+            freecolortable(bitmap->colortable, bitmap->infoheader->bits);
+            freepixel(bitmap->pixel, bitmap->infoheader->width * bitmap->infoheader->height);
+            free(bitmap->infoheader);
+        }
+        free(bitmap->header);
+    }
+    free(bitmap);
+}
 
 int bmp_loadheader(HEADER *dest, FILE *file, char *endian)
 {
