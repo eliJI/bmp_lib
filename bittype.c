@@ -43,7 +43,7 @@ void cpu_to_be16(uint8_t *buf, uint16_t val)
    buf[1] = (val & 0x00FF);
 }
 
-void byte_to_bit(uint8_t *buf)
+void byte_to_bits(uint8_t *buf)
 {
     uint8_t orig;
 

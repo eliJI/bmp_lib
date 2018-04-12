@@ -96,6 +96,7 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
     char endian = 0;
     int status;
     unsigned int i, j;
+    unsigned int x, y;
     unsigned short int padding;
     unsigned int datasize, pixelcount;
 
@@ -216,7 +217,7 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
             bmp_printcolortable(bitmap->colortable[1]);
             bmp_printline();
 
-            for(i = 0; i < (pixelcount + 1) / 8; i++)
+            for(y = bitmap->infoheader->height; y >= 0; y--)
             {
                 if(fread(buf, 1, 1, file) != 1)
                 {
@@ -225,43 +226,59 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
                     return LOAD_ERR_READING;
                 }
 
-                /* if(i % 2 == 0)
-                    putchar(' ');
-                if(i % 16 == 0)
-                    putchar('\n');
-                printf("%02x", buf[0]); */
-                
-
-                byte_to_bit(buf);
+                byte_to_bits(buf);
                 for(j = 0; j < 8; j++)
                 {
                     printf("%i ", buf[j]);
                 }
                 putchar('\n');
+                /* 
+                
+                
+                
+                
+                
+                    FIX THIS SHIT OMG
+                
+                
+                
+                
+                
+                
+                
+                
+                 */
+                for(i = 0; i < 8; i++)
+                {
+                    bmp_map_colortable_to_pixel(bitmap->pixel[y * bitmap->infoheader->width + x], bitmap->colortable[buf[i]]);
+                }
             }
             break;
 
         case 24:
-            for (i = 0; i < pixelcount; i++)
-            {
-                if (padding && !(i % bitmap->infoheader->width) && i != 0)
+            for (y = bitmap->infoheader->height; y >= 0; i--)
+            {   
+                for(x = 0; x < bitmap->infoheader->width; x++)
                 {
-                    if(fread(buf, padding, 1, file) != 1)
+                    if (padding && !(y == bitmap->infoheader->width))
+                    {
+                        if(fread(buf, padding, 1, file) != 1)
+                        {
+                            bmp_unload(bitmap);
+                            fclose(file);
+                            return LOAD_ERR_READING;
+                        }
+                    }
+                    if(fread(buf, 3, 1, file) != 1)
                     {
                         bmp_unload(bitmap);
                         fclose(file);
                         return LOAD_ERR_READING;
                     }
+                    bitmap->pixel[y * bitmap->infoheader->width + x]->red = buf[2];
+                    bitmap->pixel[y * bitmap->infoheader->width + x]->green = buf[1];
+                    bitmap->pixel[y * bitmap->infoheader->width + x]->blue = buf[0];
                 }
-                if(fread(buf, 3, 1, file) != 1)
-                {
-                    bmp_unload(bitmap);
-                    fclose(file);
-                    return LOAD_ERR_READING;
-                }
-                bitmap->pixel[i]->red = buf[2];
-                bitmap->pixel[i]->green = buf[1];
-                bitmap->pixel[i]->blue = buf[0];
             }
             break;
     }
