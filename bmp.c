@@ -5,7 +5,14 @@
 #include "bittype.h"
 #include "bmp.h"
 
-/* POINTER MIGHT BE WRONG */
+void initbitmap(BITMAP *bitmap)
+{
+    bitmap->header       = NULL;
+    bitmap->infoheader   = NULL;
+    bitmap->colortable   = NULL;
+    bitmap->pixel        = NULL;
+}
+
 void freecolortable(COLORTABLE **colortable, uint16_t bits)
 {
     uint16_t i;
@@ -86,108 +93,100 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
 {
     FILE *file = NULL;
     BITMAP *bitmap = NULL;
-    HEADER *header = NULL;
-    INFOHEADER *infoheader = NULL;
-    COLORTABLE **colortable = NULL;
-    PIXEL **pixel = NULL;
-    unsigned int datasize, pixelcount;
-    unsigned short int padding;
-    int status;
-    unsigned int i, j;
     char endian = 0;
+    int status;
+    unsigned int i;
+    unsigned short int padding;
+    unsigned int datasize, pixelcount;
+    
     uint8_t buf[3];
 
     assert(filename != NULL);
     assert(dest == NULL);
 
+    if((file = fopen(filename, "rb")) == NULL)
+        return LOAD_ERR_OPENING;
+    
     if((bitmap = malloc(sizeof(BITMAP))) == NULL)
-        return LOAD_ERR_ALLOC_ERR;
-
-    if((header = malloc(sizeof(HEADER))) == NULL)
     {
-        bmp_unload(bitmap);
-        return LOAD_ERR_ALLOC_ERR;
-    }
-        
-    if((infoheader = malloc(sizeof(INFOHEADER))) == NULL)
-    {
-        bmp_unload(bitmap);
+        fclose(file);
         return LOAD_ERR_ALLOC_ERR;
     }
     
-    if((file = fopen(filename, "rb")) == NULL)
+    if((bitmap->header = malloc(sizeof(HEADER))) == NULL)
     {
         bmp_unload(bitmap);
-        return LOAD_ERR_OPENING;
+        fclose(file);
+        return LOAD_ERR_ALLOC_ERR;
+    }
+        
+    if((bitmap->infoheader = malloc(sizeof(INFOHEADER))) == NULL)
+    {
+        bmp_unload(bitmap);
+        fclose(file);
+        return LOAD_ERR_ALLOC_ERR;
     }
 
-    if((status = bmp_loadheader(header, file, &endian)) != LOAD_SUCC)
+    if((status = bmp_loadheader(bitmap->header, file, &endian)) != LOAD_SUCC)
     {
         bmp_unload(bitmap);
         fclose(file);
         return status;
     }
 
-    bmp_printheader(header);    
+    bmp_printheader(bitmap->header);    
 
-    if((status = bmp_loadinfoheader(infoheader, file, endian)) != LOAD_SUCC)
+    if((status = bmp_loadinfoheader(bitmap->infoheader, file, endian)) != LOAD_SUCC)
     {
         bmp_unload(bitmap);
         fclose(file);
         return status;
     }
 
-    if(infoheader->planes != 1 )
+    if(bitmap->infoheader->planes != 1 )
     {
-        free(header);
+        bmp_unload(bitmap);
         fclose(file);
-        free(infoheader);
         return LOAD_ERR_CORUPTED_HEADER;
     }
 
-    if(infoheader->compression != 0)
+    if(bitmap->infoheader->compression != 0)
     {
-        free(header);
+        bmp_unload(bitmap);
         fclose(file);
-        free(infoheader);
         return LOAD_ERR_NOT_SUPPORTED; 
     }
 
-    bmp_printinfoheader(infoheader);
+    bmp_printinfoheader(bitmap->infoheader);
 
-    if(infoheader->bits == 1 || infoheader->bits == 4)
+    if(bitmap->infoheader->bits == 1 || bitmap->infoheader->bits == 4)
     {
-        if((colortable = malloccolortable(infoheader->bits)) == NULL)
+        if((bitmap->colortable = malloccolortable(bitmap->infoheader->bits)) == NULL)
         {
-            free(header);
+            bmp_unload(bitmap);
             fclose(file);
-            free(infoheader);
             return status;
         }        
     }
 
     /* bmp_printtcolortable(colortable); */
 
-    if(infoheader->bits != 24)      /* DURING DEV THIS SHOULD BE CHANGED */
+    if(bitmap->infoheader->bits != 24)      /* DURING DEV THIS SHOULD BE CHANGED */
     {
-        free(header);
+        bmp_unload(bitmap);
         fclose(file);
-        free(infoheader);
-        freecolortable(colortable, infoheader->bits);
         return LOAD_ERR_NOT_SUPPORTED;
     }
     
-    datasize = calcpixelsize(header, infoheader);
-    pixelcount = infoheader->width * infoheader->height;
+    datasize = calcpixelsize(bitmap->header, bitmap->infoheader);
+    pixelcount = bitmap->infoheader->width * bitmap->infoheader->height;
 
-    padding = (infoheader->width % 4);
+    padding = (bitmap->infoheader->width % 4);
 
-    if((pixel = mallocpixel(pixelcount)) == NULL)
+    if((bitmap->pixel = mallocpixel(pixelcount)) == NULL)
     {
-        free(header);
+        bmp_unload(bitmap);
         fclose(file);
-        free(infoheader);
-        freecolortable(colortable, infoheader->bits);
         return status;
     }
 
@@ -196,32 +195,33 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
     printf("padding:\t\t<%i>\n", padding);
     bmp_printline();
 
-    for(i = 0; i < infoheader->width * infoheader->height; i++)
+    for(i = 0; i < pixelcount; i++)
     {
-        if(padding && !(i % infoheader->width) && i != 0)
+        if(padding && !(i % bitmap->infoheader->width) && i != 0)
         {
             fread(buf, padding, 1, file);
+            /*
             printf("DISCARDED:\t");
             for(j = 0; j < padding; j++)
                 printf("%i ", buf[j]);
             putchar('\n');
+            */
         }
         fread(buf, 3, 1, file);
-        pixel[i]->red    = buf[2];
-        pixel[i]->green  = buf[1];
-        pixel[i]->blue   = buf[0];
-        printf("%05i ", i);
-        bmp_printpixel(pixel[i]);
-        /* if((i + 125) % 250 == 0) */
+        bitmap->pixel[i]->red    = buf[2];
+        bitmap->pixel[i]->green  = buf[1];
+        bitmap->pixel[i]->blue   = buf[0];
+        /* printf("%05i ", i);
+        bmp_printpixel(pixel[i]); */
     }
 
-
+    dest = bitmap;
     return LOAD_SUCC; 
 }
 
 void bmp_unload(BITMAP *bitmap)
 {
-    if(bitmap == NULL);
+    if(bitmap == NULL)
         return;
         
     if(bitmap->header != NULL)
@@ -389,4 +389,50 @@ void bmp_printpixel(PIXEL *pixel)
 void bmp_printline(void)
 {
     printf("----------------------------------\n");
+}
+
+void bmp_printstatus(int status)
+{
+    switch(status)
+    {
+        case LOAD_SUCC:
+            printf("loading successfull! <LOAD_SUCC>\n");
+            break;
+
+        case LOAD_ERR_OPENING:
+            printf("error opening file! <LOAD_ERR_OPENING>\n");
+            break;
+
+        case LOAD_ERR_READING:
+            printf("error reading file! <LOAD_ERR_READING>\n");
+            break;
+
+        case LOAD_ERR_CORUPTED_HEADER:
+            printf("the header of the file is corrupted! <LOAD_ERR_CORUPTED_HEADER>\n");
+            break;
+
+        case LOAD_ERR_NO_BMP:
+            printf("the specified file is not a bmp! <LOAD_ERR_NO_BMP>\n");
+            break;
+
+        case LOAD_ERR_NO_ENDIAN_INFO:
+            printf("couldn't find endian information! <LOAD_ERR_NO_ENDIAN_INFO>\n");
+            break;
+
+        case LOAD_ERR_ALLOC_ERR:
+            printf("an error occured during memory allocation! <LOAD_ERR_ALLOC_ERR>\n");
+            break;
+
+        case LOAD_ERR_NOT_SUPPORTED:
+            printf("this filetype isn't supported (yet)! <LOAD_ERR_NOT_SUPPORTED>\n");
+            break;
+
+        case LOAD_ERR_TMPFILE:
+            printf("error during creation of a temporary file! <LOAD_ERR_TMPFILE>\n");
+            break;
+
+        default:
+            printf("unknown status!");
+            break;
+    }
 }

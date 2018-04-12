@@ -51,13 +51,14 @@ typedef struct {
 int bmp_loadfromfile(BITMAP *dest, const char filename[]);
 void bmp_unload(BITMAP *bitmap);
 
+int bmp_loadheader(HEADER *dest, FILE *file, char *endian);
+int bmp_loadinfoheader(INFOHEADER *dest, FILE *file, const char endian);
+
 void bmp_printheader(HEADER *header);
 void bmp_printinfoheader(INFOHEADER *infoheader);
 void bmp_printpixel(PIXEL *pixel);
 void bmp_printline(void);
-
-int bmp_loadheader(HEADER *dest, FILE *file, char *endian);
-int bmp_loadinfoheader(INFOHEADER *dest, FILE *file, const char endian);
+void bmp_printstatus(int status);
 
 
 #define BMP_ID 19778

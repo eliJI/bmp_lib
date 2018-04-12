@@ -8,10 +8,13 @@ int main(void)
     int status;
     BITMAP *bitmap = NULL;
 
-    status = bmp_loadfromfile(bitmap, "images/colors/red.bmp");
+    status = bmp_loadfromfile(bitmap, "images/sample.bmp");
 
     bmp_printline();
     printf("status: %i\n", status);
-
+    bmp_printline();
+    bmp_printstatus(status);
+    bmp_printline();
+    bmp_unload(bitmap);
     return EXIT_SUCCESS;
 }
