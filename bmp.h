@@ -48,12 +48,18 @@ typedef struct {
     PIXEL **pixel;
 } BITMAP;
 
+int bmp_savetofile24bit(BITMAP *bitmap, const char filename[]);
 int bmp_loadfromfile(BITMAP *dest, const char filename[]);
+
 void bmp_unload(BITMAP *bitmap);
 
 int bmp_loadheader(HEADER *dest, FILE *file, char *endian);
 int bmp_loadinfoheader(INFOHEADER *dest, FILE *file, const char endian);
 int bmp_loadcolortable(COLORTABLE **colortable, size_t num, FILE *file);
+
+int bmp_loadpixelmonochrome(BITMAP *bitmap, FILE *file);
+int bmp_loadpixel24bit(BITMAP *bitmap, FILE *file);
+
 
 void bmp_map_colortable_to_pixel(PIXEL *pixel, COLORTABLE *colortable);
 
@@ -81,5 +87,6 @@ void bmp_printstatus(int status);
 #define LOAD_ERR_ALLOC_ERR          15
 #define LOAD_ERR_NOT_SUPPORTED      16
 #define LOAD_ERR_TMPFILE            17
+
 
 #endif

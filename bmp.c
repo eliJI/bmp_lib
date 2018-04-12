@@ -95,12 +95,8 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
     BITMAP *bitmap = NULL;
     char endian = 0;
     int status;
-    unsigned int i, j;
-    unsigned int x, y;
     unsigned short int padding;
     unsigned int datasize, pixelcount;
-
-    uint8_t buf[8];
 
     assert(filename != NULL);
     assert(dest == NULL);
@@ -182,13 +178,6 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
             return status;
         }
     }
-
-    if(bitmap->infoheader->bits != 24 && bitmap->infoheader->bits != 1)
-    {
-        bmp_unload(bitmap);
-        fclose(file);
-        return LOAD_ERR_NOT_SUPPORTED;
-    }
     
     datasize = calcpixelsize(bitmap->header, bitmap->infoheader);
     pixelcount = bitmap->infoheader->width * bitmap->infoheader->height;
@@ -210,80 +199,28 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[])
     switch(bitmap->infoheader->bits)
     {
         case 1:
-            printf("COLORTABLES \n");
-            printf("<0> ");
-            bmp_printcolortable(bitmap->colortable[0]);
-            printf("<1> ");
-            bmp_printcolortable(bitmap->colortable[1]);
-            bmp_printline();
-
-            for(y = bitmap->infoheader->height; y >= 0; y--)
-            {
-                if(fread(buf, 1, 1, file) != 1)
-                {
-                    bmp_unload(bitmap);
-                    fclose(file);
-                    return LOAD_ERR_READING;
-                }
-
-                byte_to_bits(buf);
-                for(j = 0; j < 8; j++)
-                {
-                    printf("%i ", buf[j]);
-                }
-                putchar('\n');
-                /* 
-                
-                
-                
-                
-                
-                    FIX THIS SHIT OMG
-                
-                
-                
-                
-                
-                
-                
-                
-                 */
-                for(i = 0; i < 8; i++)
-                {
-                    bmp_map_colortable_to_pixel(bitmap->pixel[y * bitmap->infoheader->width + x], bitmap->colortable[buf[i]]);
-                }
-            }
+            status = bmp_loadpixelmonochrome(bitmap, file);
             break;
 
         case 24:
-            for (y = bitmap->infoheader->height; y >= 0; i--)
-            {   
-                for(x = 0; x < bitmap->infoheader->width; x++)
-                {
-                    if (padding && !(y == bitmap->infoheader->width))
-                    {
-                        if(fread(buf, padding, 1, file) != 1)
-                        {
-                            bmp_unload(bitmap);
-                            fclose(file);
-                            return LOAD_ERR_READING;
-                        }
-                    }
-                    if(fread(buf, 3, 1, file) != 1)
-                    {
-                        bmp_unload(bitmap);
-                        fclose(file);
-                        return LOAD_ERR_READING;
-                    }
-                    bitmap->pixel[y * bitmap->infoheader->width + x]->red = buf[2];
-                    bitmap->pixel[y * bitmap->infoheader->width + x]->green = buf[1];
-                    bitmap->pixel[y * bitmap->infoheader->width + x]->blue = buf[0];
-                }
-            }
+            status = bmp_loadpixel24bit(bitmap, file);
             break;
-    }
-    
 
+        default:
+            bmp_unload(bitmap);
+            fclose(file);
+            return LOAD_ERR_NOT_SUPPORTED;
+    }
+
+    if(status != LOAD_SUCC)
+    {
+        bmp_unload(bitmap);
+        fclose(file);
+        return status;
+    }
+
+    
+    fclose(file);
     dest = bitmap;
     return LOAD_SUCC; 
 }
@@ -410,6 +347,93 @@ int bmp_loadcolortable(COLORTABLE **colortable, size_t num, FILE *file)
         colortable[i]->red = buf[2];
         colortable[i]->green = buf[1];
         colortable[i]->blue = buf[0];
+    }
+
+    return LOAD_SUCC;
+}
+
+int bmp_loadpixelmonochrome(BITMAP *bitmap, FILE *file)
+{
+    int x, y;
+    int i;
+    int width, height;
+    unsigned int padding;
+
+    uint8_t buf[8];
+
+    assert(bitmap != NULL);
+    assert(file != NULL);
+
+    width   = bitmap->infoheader->width     - 1;
+    height  = bitmap->infoheader->height    - 1;
+
+    padding = (bitmap->infoheader->width % 4);
+
+    printf("COLORTABLES \n");
+    printf("<0> ");
+    bmp_printcolortable(bitmap->colortable[0]);
+    printf("<1> ");
+    bmp_printcolortable(bitmap->colortable[1]);
+    bmp_printline();
+
+    for (y = height; y >= 0; y--)
+    {
+        for(x = 0; x < (width / 8) + 1; x++)
+        {
+            if(x * 8 > width)
+            {
+                if(fread(buf, padding, 1, file) != LOAD_SUCC)
+                    return LOAD_ERR_READING;
+            }
+            if (fread(buf, 1, 1, file) != 1)
+                return LOAD_ERR_READING;
+            byte_to_bits(buf);
+
+            for (i = 0; i < 8; i++)
+            {
+                if((x * 8) + i > width)
+                    break;
+                bmp_map_colortable_to_pixel(bitmap->pixel[y * bitmap->infoheader->width + x + i], bitmap->colortable[buf[i]]);
+            }
+        }
+        
+    }
+
+    return LOAD_SUCC;
+}
+
+int bmp_loadpixel24bit(BITMAP *bitmap, FILE *file)
+{
+    int x, y;
+    unsigned int padding;
+    unsigned int width, height;
+
+    uint8_t buf[3];
+
+    assert(bitmap != NULL);
+    assert(file != NULL);
+
+    width   = bitmap->infoheader->width     - 1;
+    height  = bitmap->infoheader->height    - 1;
+
+    padding = (bitmap->infoheader->width % 4);
+
+    for (y = height; y >= 0; y--)
+    {
+        for (x = 0; x < (int) bitmap->infoheader->width; x++)
+        {
+            if (padding && !( y == (int) bitmap->infoheader->width))
+            {
+                if (fread(buf, padding, 1, file) != 1)
+                    return LOAD_ERR_READING;
+            }
+            if (fread(buf, 3, 1, file) != 1)
+                return LOAD_ERR_READING;
+
+            bitmap->pixel[y * width + x]->red = buf[2];
+            bitmap->pixel[y * width + x]->green = buf[1];
+            bitmap->pixel[y * width + x]->blue = buf[0];
+        }
     }
 
     return LOAD_SUCC;
