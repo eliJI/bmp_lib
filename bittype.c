@@ -43,6 +43,21 @@ void cpu_to_be16(uint8_t *buf, uint16_t val)
    buf[1] = (val & 0x00FF);
 }
 
+void cpu_to_le32(uint8_t *buf, uint32_t val)
+{
+    buf[0] = (val & 0x000000FF);
+    buf[1] = (val & 0x0000FF00) >> 8;
+    buf[2] = (val & 0x00FF0000) >> 16;
+    buf[3] = (val & 0xFF000000) >> 24;
+}
+void cpu_to_be32(uint8_t *buf, uint32_t val)
+{
+    buf[0] = (val & 0xFF000000) >> 24;
+    buf[1] = (val & 0x00FF0000) >> 16;
+    buf[2] = (val & 0x0000FF00) >> 8;
+    buf[3] = (val & 0x000000FF);
+}
+
 void byte_to_bits(uint8_t *buf)
 {
     uint8_t orig;

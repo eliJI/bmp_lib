@@ -6,22 +6,22 @@
 
 
 typedef struct {
-   uint8_t type[2];                         /* Magic identifier            */
-   uint32_t size;                           /* File size in bytes          */
+   uint8_t type[2];                         /*  Magic identifier            */
+   uint32_t size;                           /*  File size in bytes          */
    uint8_t reserved1[2], reserved2[2];
-   uint32_t offset;                         /* Offset to image data, bytes */
+   uint32_t offset;                         /*  Offset to image data, bytes */
 } HEADER;
 
 typedef struct {
-   uint32_t size;                           /* Header size in bytes      */
-   uint32_t width,height;                   /* Width and height of image */
-   uint16_t planes;                         /* Number of colour planes   */
-   uint16_t bits;                           /* Bits per pixel            */
-   uint32_t compression;                    /* Compression type          */
-   uint32_t imagesize;                      /* Image size in bytes       */
-   uint32_t xresolution,yresolution;        /* Pixels per meter          */
-   uint32_t ncolours;                       /* Number of colours         */
-   uint32_t importantcolours;               /* Important colours         */
+   uint32_t size;                           /* Header size in bytes         */
+   uint32_t width,height;                   /* Width and height of image    */
+   uint16_t planes;                         /* Number of colour planes      */
+   uint16_t bits;                           /* Bits per pixel               */
+   uint32_t compression;                    /* Compression type             */
+   uint32_t imagesize;                      /* Image size in bytes          */
+   uint32_t xresolution,yresolution;        /* Pixels per meter             */
+   uint32_t ncolours;                       /* Number of colours            */
+   uint32_t importantcolours;               /* Important colours            */
 } INFOHEADER;
 
 typedef struct {
@@ -54,6 +54,7 @@ int bmp_loadfromfile(BITMAP *dest, const char filename[]);
 void bmp_unload(BITMAP *bitmap);
 
 int bmp_loadheader(HEADER *dest, FILE *file, char *endian);
+int bmp_saveheader(HEADER *dest, FILE *file);
 int bmp_loadinfoheader(INFOHEADER *dest, FILE *file, const char endian);
 int bmp_loadcolortable(COLORTABLE **colortable, size_t num, FILE *file);
 

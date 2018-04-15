@@ -87,7 +87,22 @@ void freepixel(PIXEL **pixel, size_t size)
     free(pixel);
 }
 
-unsigned int calcpixelsize(const HEADER *header, const INFOHEADER *infoheader);
+int bmp_savetofile24bit(BITMAP *bitmap, const char filename[])
+{
+    FILE *file;
+
+    int i, j;
+    
+    assert(bitmap != NULL);
+    assert(filename != NULL);
+
+    if((file = fopen(filename, "wb")) == NULL)
+        return LOAD_ERR_OPENING;
+
+    bitmap->infoheader->bits = 24;
+    bitmap->infoheader->ncolours = 0;
+    bitmap->infoheader->ncolours = 0;
+}
 
 int bmp_loadfromfile(BITMAP *dest, const char filename[])
 {
@@ -280,6 +295,34 @@ int bmp_loadheader(HEADER *dest, FILE *file, char *endian)
         dest->reserved2[0]  = buf[9];
         dest->reserved2[1]  = buf[8];
         dest->offset        = be32_to_cpu(buf + 10);
+        return LOAD_SUCC;
+    }
+    else
+        return LOAD_ERR_NO_BMP;
+}
+
+/*   MAKE WORK   */
+int bmp_saveheader(HEADER *dest, FILE *file)    
+{
+    uint8_t buf[BMP_HEADER_LEN];
+
+    assert(dest != NULL);
+    assert(file != NULL);
+
+    if (fread(buf, BMP_HEADER_LEN, 1, file) != 1)
+        return LOAD_ERR_READING;
+
+    if(buf[1] == 'B' && buf[0] == 'M')
+    {
+        
+        dest->type[0] = buf[1];
+        dest->type[1] = buf[0];
+        dest->size = be32_to_cpu(buf + 2);
+        dest->reserved1[0] = buf[7];
+        dest->reserved1[1] = buf[6];
+        dest->reserved2[0] = buf[9];
+        dest->reserved2[1] = buf[8];
+        dest->offset = be32_to_cpu(buf + 10);
         return LOAD_SUCC;
     }
     else
